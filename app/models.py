@@ -56,15 +56,38 @@ class BaseEntity:
 class User(BaseEntity):
     """Пользователь приложения."""
 
+    _FULL_NAME_PATTERN = re.compile(r"^[\w\s-]+$")
     USERNAME_MIN_LENGTH = 3
     USERNAME_MAX_LENGTH = 32
     _USERNAME_PATTERN = re.compile(r"^[A-Za-z0-9_]+$")
     _EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
-    def __init__(self, username: str, email: str) -> None:
+    def __init__(self, username: str, email: str, full_name: str | None = None) -> None:
         super().__init__()           # id и created_at создаёт родитель
         self.username = username
         self.email = email
+        if full_name is not None:
+            self.full_name = full_name
+        else:
+            self._full_name = None
+        
+        self._is_active = True 
+
+    @property
+    def full_name(self) -> str | None:
+        return self._full_name
+
+    @full_name.setter
+    def full_name(self, value: str|None) -> None:
+        if value is None:
+            self._full_name = None
+            return 
+        if not isinstance(value, str):
+            raise ValidationError("full_name должен быть строкой или None")
+        value = value.strip() #удаляет пробелы
+        if not self.FULL_NAME_MIN_LENGTH <=len(value) <=self.FULL_NAMR_MAX_LENGTH:
+            raise ValidationError("full_name: только буквы, пробелы и дефисы")
+        self._full_name = value
 
     @property
     def username(self) -> str:
@@ -99,7 +122,7 @@ class User(BaseEntity):
 
     def to_dict(self) -> dict:
         data = super().to_dict()     # расширяем метод родителя
-        data.update(username=self.username, email=self.email)
+        data.update(username=self.username, email=self.email, full_name=self.full_name, is_active=self.is_active)
         return data
 
     def __str__(self) -> str:
@@ -108,6 +131,19 @@ class User(BaseEntity):
     def __repr__(self) -> str:
         return f"User(id={self.id}, username={self.username!r})"
 
+
+    @property
+    def is_active(self) -> bool:
+        """Доступно только для чтения. """
+        return self._is_active
+
+    def deactivate(self) ->None:
+        """Сделать пользователя неактивным"""
+        self._is_active = False
+
+    def activate(self) ->None:
+        """Сделать пользователя активным"""
+        self._is_active = True
 
 class Currency(BaseEntity):
     """Валюта из справочника ЦБ РФ."""

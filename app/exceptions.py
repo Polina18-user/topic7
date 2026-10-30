@@ -15,3 +15,7 @@ class NotFoundError(AppError):
 
 class ProviderError(AppError):
     """Ошибка получения курсов"""
+
+
+class InactiveUserError(AppError):
+    """Попытка действия от имени деактивированного пользователя."""
