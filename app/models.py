@@ -1,7 +1,7 @@
 """Модели предметной области: User, Currency, Subscription, Rate."""
 
 from __future__ import annotations
-
+import functools
 
 import re
 from datetime import date, datetime
@@ -56,38 +56,21 @@ class BaseEntity:
 class User(BaseEntity):
     """Пользователь приложения."""
 
-    _FULL_NAME_PATTERN = re.compile(r"^[\w\s-]+$")
     USERNAME_MIN_LENGTH = 3
     USERNAME_MAX_LENGTH = 32
+    FULL_NAME_MIN_LENGTH = 2
+    FULL_NAME_MAX_LENGTH = 100
+    
     _USERNAME_PATTERN = re.compile(r"^[A-Za-z0-9_]+$")
     _EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+    _FULL_NAME_PATTERN = re.compile(r"^[\w\s-]+$")
 
     def __init__(self, username: str, email: str, full_name: str | None = None) -> None:
         super().__init__()           # id и created_at создаёт родитель
         self.username = username
         self.email = email
-        if full_name is not None:
-            self.full_name = full_name
-        else:
-            self._full_name = None
-        
+        self.full_name = full_name   # Сеттер сам обработает None
         self._is_active = True 
-
-    @property
-    def full_name(self) -> str | None:
-        return self._full_name
-
-    @full_name.setter
-    def full_name(self, value: str|None) -> None:
-        if value is None:
-            self._full_name = None
-            return 
-        if not isinstance(value, str):
-            raise ValidationError("full_name должен быть строкой или None")
-        value = value.strip() #удаляет пробелы
-        if not self.FULL_NAME_MIN_LENGTH <=len(value) <=self.FULL_NAMR_MAX_LENGTH:
-            raise ValidationError("full_name: только буквы, пробелы и дефисы")
-        self._full_name = value
 
     @property
     def username(self) -> str:
@@ -120,40 +103,70 @@ class User(BaseEntity):
             raise ValidationError(f"Некорректный email: {value!r}")
         self._email = value
 
+    @property
+    def full_name(self) -> str | None:
+        return self._full_name
+
+    @full_name.setter
+    def full_name(self, value: str | None) -> None:
+        if value is None:
+            self._full_name = None
+            return 
+        if not isinstance(value, str):
+            raise ValidationError("full_name должен быть строкой или None")
+        value = value.strip()
+        if not self.FULL_NAME_MIN_LENGTH <= len(value) <= self.FULL_NAME_MAX_LENGTH:
+            raise ValidationError(
+                f"Длина full_name: от {self.FULL_NAME_MIN_LENGTH} "
+                f"до {self.FULL_NAME_MAX_LENGTH} символов"
+            )
+        if not self._FULL_NAME_PATTERN.match(value):
+            raise ValidationError("full_name: только буквы, пробелы и дефисы")
+        self._full_name = value
+
+    @property
+    def is_active(self) -> bool:
+        """Доступно только для чтения."""
+        return self._is_active
+
+    def deactivate(self) -> None:
+        """Сделать пользователя неактивным."""
+        self._is_active = False
+
+    def activate(self) -> None:
+        """Сделать пользователя активным."""
+        self._is_active = True
+
     def to_dict(self) -> dict:
-        data = super().to_dict()     # расширяем метод родителя
-        data.update(username=self.username, email=self.email, full_name=self.full_name, is_active=self.is_active)
+        data = super().to_dict()
+        data.update(
+            username=self.username, 
+            email=self.email, 
+            full_name=self.full_name, 
+            is_active=self.is_active
+        )
         return data
 
     def __str__(self) -> str:
+        if self.full_name:
+            return f"{self.full_name} ({self.username}) <{self.email}>"
         return f"{self.username} <{self.email}>"
 
     def __repr__(self) -> str:
         return f"User(id={self.id}, username={self.username!r})"
 
 
-    @property
-    def is_active(self) -> bool:
-        """Доступно только для чтения. """
-        return self._is_active
-
-    def deactivate(self) ->None:
-        """Сделать пользователя неактивным"""
-        self._is_active = False
-
-    def activate(self) ->None:
-        """Сделать пользователя активным"""
-        self._is_active = True
-
 class Currency(BaseEntity):
     """Валюта из справочника ЦБ РФ."""
 
     CODE_LENGTH = 3
+    _NUM_CODE_PATTERN = re.compile(r"^\d{3}$")
 
-    def __init__(self, code: str, name: str) -> None:
+    def __init__(self, code: str, name: str, num_code: str | None = None) -> None:
         super().__init__()
         self.code = code
         self.name = name
+        self.num_code = num_code
 
     @property
     def code(self) -> str:
@@ -178,9 +191,25 @@ class Currency(BaseEntity):
             raise ValidationError("Название валюты не может быть пустым")
         self._name = value.strip()
 
+    @property
+    def num_code(self) -> str | None:
+        return self._num_code
+
+    @num_code.setter
+    def num_code(self, value: str | None) -> None:
+        if value is None:
+            self._num_code = None
+            return
+        if not isinstance(value, str):
+            raise ValidationError("num_code должен быть строкой")
+        value = value.strip()
+        if not self._NUM_CODE_PATTERN.match(value):
+            raise ValidationError(f"Цифровой код должен состоять из 3 цифр: {value!r}")
+        self._num_code = value
+
     def to_dict(self) -> dict:
         data = super().to_dict()
-        data.update(code=self.code, name=self.name)
+        data.update(code=self.code, name=self.name, num_code=self.num_code)
         return data
 
     def __str__(self) -> str:
@@ -227,11 +256,12 @@ class Subscription:
         return f"Subscription(user_id={self.user.id}, currency_id={self.currency.id})"
 
 
+@functools.total_ordering
 class Rate:
     """Курс валюты на дату. Не хранится в БД."""
 
     def __init__(self, code: str, name: str, nominal: int,
-                 value: Decimal, on_date: date) -> None:
+                 value: Decimal, on_date: date, num_code: str | None = None) -> None:
         if nominal <= 0:
             raise ValidationError("Номинал должен быть положительным")
         if value <= 0:
@@ -241,11 +271,17 @@ class Rate:
         self.nominal = nominal
         self.value = Decimal(value)
         self.date = on_date
+        self.num_code = num_code
 
     @property
     def per_unit(self) -> Decimal:
         """Стоимость одной единицы валюты в рублях."""
         return self.value / self.nominal
+
+    def __lt__(self, other: object) -> bool:
+        if not isinstance(other, Rate):
+            return NotImplemented
+        return self.per_unit < other.per_unit
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, Rate):

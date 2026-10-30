@@ -51,7 +51,9 @@ def main() -> None:
                 tracker.unsubscribe(ask_user_id(), input("Код валюты: "))
                 print("Подписка отменена")
             elif choice == "5":
-                for rate in tracker.get_user_rates(ask_user_id()):
+                rates = tracker.get_user_rates(ask_user_id())
+                # Сортируем от дорогих к дешевым (reverse=True)
+                for rate in sorted(rates, reverse=True):
                     print(rate)
             elif choice == "6":
                 code = input("Код валюты: ")

@@ -64,11 +64,15 @@ class CbrXmlProvider(RateProvider):
                 name = valute.findtext("Name", "").strip()
                 nominal = int(valute.findtext("Nominal", "").strip())
                 value = Decimal(valute.findtext("Value", "").strip().replace(",", "."))
-                rates[code] = Rate(code, name, nominal, value, on_date)
+                
+                # Читаем NumCode (если тега нет, findtext вернёт None или "")
+                num_code_raw = valute.findtext("NumCode", "").strip()
+                num_code = num_code_raw if num_code_raw else None
+                
+                rates[code] = Rate(code, name, nominal, value, on_date, num_code)
             except (ValueError, InvalidOperation):
-                continue  # пропускаем повреждённую запись
+                continue
         return rates
-
 
 class StaticRateProvider(RateProvider):
     """Курсы из заранее заданного списка."""

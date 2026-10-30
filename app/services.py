@@ -38,13 +38,15 @@ class CurrencyTracker:
 
     # ---------- валюты ----------
     def sync_currencies(self) -> int:
-        """Обновить справочник по данным поставщика. Вернуть число новых валют."""
         added = 0
         for code, rate in self._provider.get_rates().items():
             if code in self._currencies:
+                # Обновляем данные у существующей валюты
                 self._currencies[code].name = rate.name
+                self._currencies[code].num_code = rate.num_code
             else:
-                self._currencies[code] = Currency(code, rate.name)
+                # Создаём новую с передачей num_code
+                self._currencies[code] = Currency(code, rate.name, rate.num_code)
                 added += 1
         return added
 
