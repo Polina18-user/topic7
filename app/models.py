@@ -1,6 +1,7 @@
-"""Модели предметной области: User, Currency, Rate."""
 """Модели предметной области: User, Currency, Subscription, Rate."""
+
 from __future__ import annotations
+
 
 import re
 from datetime import date, datetime
