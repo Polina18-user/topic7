@@ -27,51 +27,85 @@ def ask_user_id() -> int:
 
 
 def main() -> None:
-    tracker = CurrencyTracker(choose_provider())
-    try:
-        print(f"Загружено валют: {tracker.sync_currencies()}")
-    except ProviderError as exc:
-        print(f"{exc}\nЗапустите программу с ключом --offline")
-        return
+    provider = choose_provider()
+    tracker = CurrencyTracker(provider)
 
-    while True:
-        print(MENU)
-        choice = input("Выберите пункт: ").strip()
-        try:
-            if choice == "1":
-                user = tracker.register_user(input("Имя: "), input("Email: "))
-                print(f"Зарегистрирован: {user} (id={user.id})")
-            elif choice == "2":
-                for currency in tracker.currencies:
-                    print(currency)
-            elif choice == "3":
-                tracker.subscribe(ask_user_id(), input("Код валюты: "))
-                print("Подписка оформлена")
-            elif choice == "4":
-                tracker.unsubscribe(ask_user_id(), input("Код валюты: "))
-                print("Подписка отменена")
-            elif choice == "5":
-                rates = tracker.get_user_rates(ask_user_id())
-                # Сортируем от дорогих к дешевым (reverse=True)
-                for rate in sorted(rates, reverse=True):
-                    print(rate)
-            elif choice == "6":
-                code = input("Код валюты: ")
-                subscribers = tracker.get_subscribers(code)
-                if not subscribers:
-                    print("Нет подписчиков")
-                else:
-                    print(f"Подписчики {code.strip().upper()}:")
-                    for user in subscribers:
-                        print(f"  {user}")
-            elif choice == "0":
+    print("Синхронизация справочника валют...")
+    try:
+        tracker.sync_currencies()
+    except ProviderError as exc:
+        print(f"\nОшибка: {exc}")
+        answer = input("Перейти в автономный режим? (y/n): ").strip().lower()
+        if answer == 'y':
+            print("Переключение на автономный режим...")
+            provider = StaticRateProvider.demo()
+            tracker = CurrencyTracker(provider)
+            tracker.sync_currencies()  # В офлайн-режиме это не вызовет ошибку
+            print("Готово.")
+        else:
+            print("Завершение работы.")
+            return
+    else:
+
+        print("Синхронизация прошла успешно.")
+    finally:
+        print("--- Синхронизация завершена ---")
+
+
+    try:
+        while True:
+            print(MENU)
+            try:
+                choice = input("Выберите пункт: ").strip()
+            except EOFError:
+                print("\nДо свидания")
                 break
-            else:
-                print("Нет такого пункта")
-        except AppError as exc:
-            print(f"Ошибка: {exc}")
-        except ValueError:
-            print("Ошибка: id должен быть целым числом")
+
+            try:
+                if choice == "1":
+                    user = tracker.register_user(input("Имя: "), input("Email: "))
+                    print(f"Зарегистрирован: {user} (id={user.id})")
+                elif choice == "2":
+                    for currency in tracker.currencies:
+                        print(currency)
+                elif choice == "3":
+                    tracker.subscribe(ask_user_id(), input("Код валюты: "))
+                    print("Подписка оформлена")
+                elif choice == "4":
+                    tracker.unsubscribe(ask_user_id(), input("Код валюты: "))
+                    print("Подписка отменена")
+                elif choice == "5":
+                    try:
+                        rates = tracker.get_user_rates(ask_user_id())
+                        # Сортируем от дорогих к дешевым
+                        for rate in sorted(rates, reverse=True):
+                            print(rate)
+                    except ProviderError as exc:
+                        print(f"\nНе удалось обновить курсы: {exc}")
+                        print("Возврат в главное меню.")
+                elif choice == "6":
+                    code = input("Код валюты: ")
+                    subscribers = tracker.get_subscribers(code)
+                    if not subscribers:
+                        print("Нет подписчиков")
+                    else:
+                        print(f"Подписчики {code.strip().upper()}:")
+                        for user in subscribers:
+                            print(f"  {user}")
+                elif choice == "0":
+                    print("До свидания")
+                    break
+                else:
+                    print("Нет такого пункта")
+            except AppError as exc:
+                # Ловим только наши доменные ошибки, не трогая системные
+                print(f"Ошибка: {exc}")
+            except ValueError:
+                # Ловим ошибку преобразования int(input()) в ask_user_id
+                print("Ошибка: id должен быть целым числом")
+
+    except KeyboardInterrupt:
+        print("\nДо свидания")
 
 
 if __name__ == "__main__":
