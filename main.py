@@ -108,5 +108,25 @@ def main() -> None:
         print("\nДо свидания")
 
 
+tracker = CurrencyTracker(StaticRateProvider.demo())
+tracker.sync_currencies()
+anna = tracker.register_user("anna", "a@ex.ru")
+tracker.subscribe(anna.id, "USD")
+
+# Сохраняем
+tracker.save("data/test_state.json")
+
+# Создаем новый чистый трекер
+tracker2 = CurrencyTracker(StaticRateProvider.demo())
+
+# Загружаем
+tracker2.load("data/test_state.json")
+
+# Проверяем, что всё на месте
+print(tracker2.users[0].username)  # anna
+print(len(tracker2.get_user_currencies(1)))  # 1 (подписка на USD)
+print(tracker2.currencies[0].id)   # старые ID сохранились
+
+
 if __name__ == "__main__":
     main()
