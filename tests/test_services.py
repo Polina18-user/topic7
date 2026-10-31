@@ -1,5 +1,9 @@
 import pytest
 
+from app.exceptions import InactiveUserError
+from app.providers import StaticRateProvider 
+from app.services import CurrencyTracker
+
 from app.exceptions import AppError, DuplicateError, NotFoundError, ValidationError
 
 
@@ -64,3 +68,18 @@ def test_not_found_is_app_error(tracker, user_id, code):
     tracker.register_user("anna", "a@ex.ru")
     with pytest.raises(AppError):
         tracker.subscribe(user_id, code)
+
+
+# Задание 4
+# 7. Отказ в подписке для неактивного пользователя
+def test_subscribe_inactive_user():
+    # Создаем трекер с демо-валютами
+    tracker = CurrencyTracker(StaticRateProvider.demo())
+    tracker.sync_currencies()
+    
+    # Регистрируем и деактивируем пользователя
+    user = tracker.register_user("anna", "a@ex.ru")
+    user.deactivate()
+    
+    with pytest.raises(InactiveUserError, match="Пользователь 'anna' деактивирован"):
+        tracker.subscribe(user.id, "USD")

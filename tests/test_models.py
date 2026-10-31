@@ -1,7 +1,9 @@
 import pytest
 
+from decimal import Decimal
+from datetime import date
 from app.exceptions import AppError, ValidationError
-from app.models import BaseEntity, Currency, Subscription, User
+from app.models import BaseEntity, Currency, Subscription, User, Rate
 
 
 def test_user_created_with_attributes():
@@ -99,3 +101,47 @@ def test_subscriptions_with_same_pair_are_equal():
 def test_subscription_requires_objects():
     with pytest.raises(TypeError):
         Subscription("anna", "USD")
+
+
+### Задание 4
+@pytest.mark.parametrize("invalid_name", [
+    "А",                  # Слишком короткое (1 символ)
+    "  А  ",              # Слишком короткое после strip
+    "Анна123",            # Содержит цифры
+    "Анна!",              # Содержит спецсимвол
+    "А" * 101,            # Слишком длинное (101 символ)
+])
+def test_user_invalid_full_name(invalid_name):
+    with pytest.raises(ValidationError):
+        User("anna", "a@ex.ru", full_name=invalid_name)
+
+
+def test_user_valid_full_name():
+    user = User("anna", "a@ex.ru", full_name="  Анна-Мария  ")
+    assert user.full_name == "Анна-Мария"  # Пробелы обрезаны
+
+
+# 2. is_active только для чтения
+def test_user_is_active_read_only():
+    user = User("anna", "a@ex.ru")
+    assert user.is_active is True
+    
+    with pytest.raises(AttributeError):
+        user.is_active = False  # Нельзя изменить напрямую
+    
+    user.deactivate()
+    assert user.is_active is False
+
+
+# 3. Сортировка курсов (по стоимости одной единицы)
+def test_rate_sorting():
+    today = date.today()
+    usd = Rate("USD", "Доллар", 1, Decimal("90.0"), today)
+    jpy = Rate("JPY", "Йена", 100, Decimal("50.0"), today) # 50 руб за 100 шт = 0.5 за 1 шт
+    
+    rates = [jpy, usd]
+    sorted_rates = sorted(rates, reverse=True)
+    
+    # Доллар должен быть первым, так как 90 > 0.5
+    assert sorted_rates[0].code == "USD"
+    assert sorted_rates[1].code == "JPY"

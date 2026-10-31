@@ -63,7 +63,7 @@ class User(BaseEntity):
     
     _USERNAME_PATTERN = re.compile(r"^[A-Za-z0-9_]+$")
     _EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
-    _FULL_NAME_PATTERN = re.compile(r"^[\w\s-]+$")
+    _FULL_NAME_PATTERN = re.compile(r"^[a-zA-Zа-яА-ЯёЁ\s-]+$")
 
     def __init__(self, username: str, email: str, full_name: str | None = None) -> None:
         super().__init__()           # id и created_at создаёт родитель
